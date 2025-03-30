@@ -1,0 +1,12 @@
+psychrometric-spa/
+│
+├── static/                # Static files served by FastAPI
+│   ├── index.html         # Single-page HTML file
+│   ├── styles.css         # CSS for styling the app
+│   └── app.js             # JavaScript logic (modularized)
+│
+├── main.py                # FastAPI backend (entry point)
+│
+├── requirements.txt       # Python dependencies
+│
+└── README.md              # Optional: Project documentation
