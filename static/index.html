@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,28 +6,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Psychrometric Chart</title>
     <link rel="stylesheet" href="/static/styles.css">
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
 </head>
 <body>
     <div class="container">
         <!-- Left Section: Inputs -->
         <div class="left-section">
-            <h2>Psychrometric Chart</h2>
+            <h2>Air Properties</h2>
+            <!-- Manual Input Section -->
+            <div class="manual-input-section">
+                <h3>Manual Input</h3>
+                <div class="manual-input-group">
+                    <label for="tempInput">Temperature (°C):</label>
+                    <input type="number" id="tempInput" placeholder="e.g., 25">
+                </div>
+                <div class="manual-input-group">
+                    <label for="humidityInput">Relative Humidity (%):</label>
+                    <input type="number" id="humidityInput" placeholder="e.g., 50" min="0" max="100">
+                </div>
+                <button id="plotPointButton">Plot Point</button>
+                <p id="manualInputStatus"></p> <!-- Status message specific to manual input -->
+            </div>
+            <!-- File Upload Section -->
             <form id="uploadForm">
+                <h3>Plot Points from File</h3>
                 <label for="fileInput">Upload Excel File (.xlsx):</label>
                 <input type="file" id="fileInput" accept=".xlsx">
                 <div class="checkbox-container">
                     <label for="designZone">Show Comfort Zone</label>
                     <input type="checkbox" id="designZone">
                 </div>
-                <button type="submit">Update Chart</button>
+                <button id="updateChartFromFileButton">Update Chart from File</button>
+                <button id="clearDataButton">Clear Data</button>
             </form>
-            <p id="statusMessage"></p>
-            <!-- Future: Manual input section -->
-            <!-- <h3>Manual Input</h3>
-            <input type="number" id="tempInput" placeholder="Temperature (°C)">
-            <input type="number" id="humidityInput" placeholder="Humidity (%)">
-            <button id="plotPoint">Plot Point</button> -->
+            <p id="statusMessage"></p> <!-- General status message (kept from original) -->
         </div>
 
         <!-- Right Section: Chart -->
