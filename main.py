@@ -282,12 +282,48 @@ async def plot_single_point(
     if W_point is None:
          # If calculation failed, inform the client it couldn't be plotted
          raise HTTPException(status_code=400, detail="Could not calculate point properties. Check input values.")
-
+    
+    # Calculate enthalpy for the point
+    from enthalpy_calculations import calc_enthalpy
+    enthalpy = calc_enthalpy(temperature, W_point)
+    if enthalpy is None:
+        enthalpy = 0  # Fallback value if calculation fails
+    
+    # Create a detailed legend entry with all the values
+    legend_name = f"Point<br>T: {temperature:.1f}°C<br>Relative Humidity: {humidity:.1f}%<br>Humidity Ratio: {W_point:.2f} g/kg<br>Enthalpy: {enthalpy:.1f} kJ/kg"
+    
+    # Format the enthalpy value as a string first
+    enthalpy_str = f"{enthalpy:.1f}"
+    
+    # Create a complete hover template string
+    hover_template = (
+        '<b>Point Properties:</b><br>' +
+        f'Temp: %{{x:.1f}}°C<br>' +
+        f'RH: {humidity:.1f}%<br>' +
+        f'Humidity Ratio: %{{y:.2f}} g/kg<br>' +
+        f'Enthalpy: {enthalpy_str} kJ/kg<br>' +
+        '<extra></extra>'  # Removes trace name from hover
+    )
+    
+    # Add the point with detailed legend name and hover info
     fig.add_trace(go.Scatter(
-        x=[temperature], y=[W_point], mode='markers', name='Plot Point',
+        x=[temperature], y=[W_point], mode='markers', name=legend_name,
         marker=dict(color='red', size=10, symbol='circle'),
-        hovertemplate='Temp: %{x:.1f}°C<br>RH: '+f'{humidity:.1f}%'+'<br>Humidity Ratio: %{y:.2f} g/kg<extra>Manual Input</extra>'
+        hovertemplate=hover_template
     ))
+    
+    # Update layout to customize legend and modebar
+    fig.update_layout(
+        legend=dict(
+            x=0.01,  # Position at the left
+            y=0.99,  # Position at the top
+            xanchor='left',
+            yanchor='top',
+            bgcolor='rgba(255,255,255,0.8)',  # Semi-transparent white background
+            bordercolor='black',
+            borderwidth=1
+        )
+    )
 
     return {"status": "success", "figure": fig.to_json()}
 
