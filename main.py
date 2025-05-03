@@ -33,9 +33,6 @@ class CustomStaticFiles(StaticFiles):
 # Mount static files with proper configuration for both development and production
 app.mount("/static", CustomStaticFiles(directory="static", html=True), name="static")
 
-# Also mount static files at root level for production environment
-app.mount("/", CustomStaticFiles(directory="static", html=True), name="root_static")
-
 # Constants
 ATMOSPHERIC_PRESSURE_PA = 101325
 GRAMS_PER_KG = 1000
@@ -340,6 +337,15 @@ async def clear_data():
 @app.get("/")
 async def root():
     return FileResponse("static/index.html", headers={"Cache-Control": "no-store"}) # Ensure index isn't cached
+
+# Add routes to serve static files directly from root for production environment
+@app.get("/app.js")
+async def serve_app_js():
+    return FileResponse("static/app.js", headers={"Cache-Control": "no-store"})
+
+@app.get("/styles.css")
+async def serve_styles_css():
+    return FileResponse("static/styles.css", headers={"Cache-Control": "no-store"})
 
 if __name__ == "__main__":
     import uvicorn
