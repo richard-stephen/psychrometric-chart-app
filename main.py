@@ -218,10 +218,13 @@ async def generate_chart_from_file(file: UploadFile = File(...), showDesignZone:
     await file.close() # Close the file after reading
 
     try:
-        df = pd.read_excel(io.BytesIO(content))
+        # Explicitly specify the engine to use openpyxl
+        df = pd.read_excel(io.BytesIO(content), engine='openpyxl')
     except Exception as e:
-        # Catch specific pandas/excel reading errors
-        raise HTTPException(status_code=400, detail=f"Error reading Excel file: {str(e)}")
+        # Catch specific pandas/excel reading errors and provide more detailed error message
+        error_msg = str(e)
+        print(f"Excel reading error: {error_msg}")  # Log the error for debugging
+        raise HTTPException(status_code=400, detail=f"Error reading Excel file: {error_msg}")
 
     if 'Temperature' not in df.columns or 'Humidity' not in df.columns:
         raise HTTPException(status_code=400, detail="Excel file must contain 'Temperature' (°C) and 'Humidity' (%) columns")
