@@ -1,7 +1,7 @@
 // Chart module
 const ChartModule = {
     fetchDefaultChart: function(showDesignZone) {
-        return fetch(`http://localhost:8000/api/default-chart?showDesignZone=${showDesignZone}`)
+        return fetch(`/api/default-chart?showDesignZone=${showDesignZone}`)
             .then(function(response) {
                 return response.json();
             })
@@ -14,7 +14,7 @@ const ChartModule = {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('showDesignZone', showDesignZone);
-        return fetch('http://localhost:8000/api/generate-chart', {
+        return fetch('/api/generate-chart', {
             method: 'POST',
             body: formData
         })
@@ -31,7 +31,7 @@ const ChartModule = {
         formData.append('temperature', temperature);
         formData.append('humidity', humidity);
         formData.append('showDesignZone', showDesignZone);
-        return fetch('http://localhost:8000/api/plot-point', {
+        return fetch('/api/plot-point', {
             method: 'POST',
             body: formData
         })
@@ -146,7 +146,7 @@ function clearChartData() {
   const statusMessage = document.getElementById('statusMessage');
   statusMessage.textContent = 'Clearing data...';
   
-  fetch('http://localhost:8000/api/clear-data', {
+  fetch('/api/clear-data', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

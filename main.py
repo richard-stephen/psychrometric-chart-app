@@ -14,7 +14,7 @@ psy.SetUnitSystem(psy.SI)
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allows all origins for simplicity, restrict in production
+    allow_origins=["https://psychrochart.onrender.com", "http://localhost:8000"], # Specific allowed origins
     allow_credentials=True,
     allow_methods=["*"], # Allows all methods
     allow_headers=["*"], # Allows all headers
@@ -30,7 +30,11 @@ class CustomStaticFiles(StaticFiles):
         response.headers["Expires"] = "0"
         return response
 
+# Mount static files with proper configuration for both development and production
 app.mount("/static", CustomStaticFiles(directory="static", html=True), name="static")
+
+# Also mount static files at root level for production environment
+app.mount("/", CustomStaticFiles(directory="static", html=True), name="root_static")
 
 # Constants
 ATMOSPHERIC_PRESSURE_PA = 101325
