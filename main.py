@@ -284,11 +284,10 @@ async def plot_single_point(
          # If calculation failed, inform the client it couldn't be plotted
          raise HTTPException(status_code=400, detail="Could not calculate point properties. Check input values.")
     
-    # Calculate enthalpy for the point
-    from enthalpy_calculations import calc_enthalpy
+    # Calculate enthalpy for the point using the simplified function
+    from simple_enthalpy import calc_enthalpy
     enthalpy = calc_enthalpy(temperature, W_point)
-    if enthalpy is None:
-        enthalpy = 0  # Fallback value if calculation fails
+    # enthalpy will be 0 if calculation fails (handled in the function)
     
     # Create a detailed legend entry with all the values
     legend_name = f"Point<br>T: {temperature:.1f}°C<br>Relative Humidity: {humidity:.1f}%<br>Humidity Ratio: {W_point:.2f} g/kg<br>Enthalpy: {enthalpy:.1f} kJ/kg"
