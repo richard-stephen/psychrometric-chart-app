@@ -73,6 +73,21 @@ const UIModule = {
                 console.error('Error:', error);
             });
 
+        // Handle design zone checkbox change
+        designZoneCheckbox.addEventListener('change', function() {
+            statusMessage.textContent = 'Updating design zone...';
+            
+            ChartModule.fetchDefaultChart(designZoneCheckbox.checked)
+                .then(function(figure) {
+                    ChartModule.renderChart(chartContainer, figure);
+                    statusMessage.textContent = '';
+                })
+                .catch(function(error) {
+                    statusMessage.textContent = 'Error updating design zone: ' + error.message;
+                    console.error('Error:', error);
+                });
+        });
+
         // Handle file upload via button click
         updateChartFromFileButton.addEventListener('click', function(event) {
             event.preventDefault();

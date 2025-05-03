@@ -163,13 +163,16 @@ def generate_base_chart(show_design_zone: bool = False):
 
     # Comfort Zone (Optional)
     if show_design_zone:
-        T_comfort_min, T_comfort_max = 20, 25.5
-        RH_comfort_min, RH_comfort_max = 40, 60
-        W_bottom_left = calc_humidity_ratio(T_comfort_min, RH_comfort_min)
-        W_top_right = calc_humidity_ratio(T_comfort_max, RH_comfort_max)
-        fig.add_shape(type='rect', x0=T_comfort_min, y0=W_bottom_left, x1=T_comfort_max, y1=W_top_right,
-                      line=dict(color='green', width=2, dash='dash'), fillcolor='rgba(0,255,0,0.1)',
-                      name='Comfort Zone')
+        T_comfort = np.array([20, 24])
+        W_comfort_low = [calc_humidity_ratio(t, 40, ATMOSPHERIC_PRESSURE_PA) for t in T_comfort]
+        W_comfort_high = [calc_humidity_ratio(t, 60, ATMOSPHERIC_PRESSURE_PA) for t in T_comfort]
+        fig.add_trace(go.Scatter(
+            x=[20, 24, 24, 20, 20],
+            y=[W_comfort_low[0], W_comfort_low[1], W_comfort_high[1], W_comfort_high[0], W_comfort_low[0]],
+            mode='lines', name='Comfort Zone', line=dict(color='green', dash='dash', width=2),
+            fill='toself', fillcolor='rgba(0,255,0,0.1)',
+            hovertemplate='Comfort Zone<extra></extra>'
+        ))
 
     # Update Layout
     fig.update_layout(
