@@ -3,6 +3,7 @@ const ChartModule = {
     fetchDefaultChart: function(showDesignZone) {
         return fetch(`/api/default-chart?showDesignZone=${showDesignZone}`)
             .then(function(response) {
+                if (!response.ok) throw new Error(response.statusText);
                 return response.json();
             })
             .then(function(data) {
@@ -19,6 +20,7 @@ const ChartModule = {
             body: formData
         })
         .then(function(response) {
+            if (!response.ok) throw new Error(response.statusText);
             return response.json();
         })
         .then(function(data) {
@@ -36,6 +38,21 @@ const ChartModule = {
             body: formData
         })
         .then(function(response) {
+            if (!response.ok) throw new Error(response.statusText);
+            return response.json();
+        })
+        .then(function(data) {
+            return data.figure;
+        });
+    },
+
+    clearChart: function() {
+        return fetch('/api/clear-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(function(response) {
+            if (!response.ok) throw new Error(response.statusText);
             return response.json();
         })
         .then(function(data) {
@@ -44,14 +61,14 @@ const ChartModule = {
     },
 
     renderChart: function(container, figure) {
-        Plotly.newPlot(container, JSON.parse(figure).data, JSON.parse(figure).layout);
+        const fig = JSON.parse(figure);
+        Plotly.newPlot(container, fig.data, fig.layout);
     }
 };
 
 // UI module
 const UIModule = {
     init: function() {
-        const chartForm = document.getElementById('uploadForm');
         const fileInput = document.getElementById('fileInput');
         const designZoneCheckbox = document.getElementById('designZone');
         const statusMessage = document.getElementById('statusMessage');
@@ -76,7 +93,6 @@ const UIModule = {
         // Handle design zone checkbox change
         designZoneCheckbox.addEventListener('change', function() {
             statusMessage.textContent = 'Updating design zone...';
-            
             ChartModule.fetchDefaultChart(designZoneCheckbox.checked)
                 .then(function(figure) {
                     ChartModule.renderChart(chartContainer, figure);
@@ -91,14 +107,11 @@ const UIModule = {
         // Handle file upload via button click
         updateChartFromFileButton.addEventListener('click', function(event) {
             event.preventDefault();
-
             if (!fileInput.files[0]) {
                 statusMessage.textContent = 'Please select a file!';
                 return;
             }
-
             statusMessage.textContent = 'Updating chart...';
-            
             ChartModule.generateChart(fileInput.files[0], designZoneCheckbox.checked)
                 .then(function(figure) {
                     ChartModule.renderChart(chartContainer, figure);
@@ -113,21 +126,27 @@ const UIModule = {
         // Handle clear data button click
         clearDataButton.addEventListener('click', function(event) {
             event.preventDefault();
-            clearChartData();
+            statusMessage.textContent = 'Clearing data...';
+            ChartModule.clearChart()
+                .then(function(figure) {
+                    ChartModule.renderChart(chartContainer, figure);
+                    statusMessage.textContent = 'Data cleared successfully.';
+                })
+                .catch(function(error) {
+                    statusMessage.textContent = 'Error clearing data: ' + error.message;
+                    console.error('Error:', error);
+                });
         });
 
         // Handle manual input
         plotPointButton.addEventListener('click', function() {
             const temperature = parseFloat(tempInput.value);
             const humidity = parseFloat(humidityInput.value);
-
             if (isNaN(temperature) || isNaN(humidity)) {
                 manualInputStatus.textContent = 'Please enter valid numbers!';
                 return;
             }
-
             manualInputStatus.textContent = 'Plotting point...';
-
             ChartModule.plotManualPoint(temperature, humidity, designZoneCheckbox.checked)
                 .then(function(figure) {
                     ChartModule.renderChart(chartContainer, figure);
@@ -140,35 +159,6 @@ const UIModule = {
         });
     }
 };
-
-function clearChartData() {
-  const chartContainer = document.getElementById('chartContainer');
-  const statusMessage = document.getElementById('statusMessage');
-  statusMessage.textContent = 'Clearing data...';
-  
-  fetch('/api/clear-data', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    }
-  })
-  .then(response => {
-    return response.json();
-  })
-  .then(data => {
-    if (data.status === 'success') {
-      // Use the figure returned from the clear-data endpoint
-      ChartModule.renderChart(chartContainer, data.figure);
-      statusMessage.textContent = 'Data cleared successfully.';
-    } else {
-      statusMessage.textContent = 'Failed to clear data.';
-    }
-  })
-  .catch(error => {
-    console.error('Error during clear data operation:', error);
-    statusMessage.textContent = 'Error clearing data.';
-  });
-}
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', function() {
