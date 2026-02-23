@@ -50,14 +50,11 @@ ENTHALPY_DATA = pd.read_csv('enthalpy_intersections.csv').to_dict('records')
 T_DB_RANGE    = np.linspace(T_DB_MIN, T_DB_MAX, 100)
 W_SAT_LIST    = [calc_humidity_ratio(t, 100.0) for t in T_DB_RANGE]
 _SAT_AT_T     = {t: calc_humidity_ratio(t, 100.0) for t in t_axis}
-_T_comfort    = np.array([20, 24])
-W_COMFORT_LOW  = [calc_humidity_ratio(t, 40) for t in _T_comfort]
-W_COMFORT_HIGH = [calc_humidity_ratio(t, 60) for t in _T_comfort]
 
 
 # --- Helper Functions ---
 
-def generate_base_chart(show_design_zone: bool = False):
+def generate_base_chart():
     """Generates the base psychrometric chart figure with enthalpy lines."""
     fig = go.Figure()
 
@@ -92,6 +89,8 @@ def generate_base_chart(show_design_zone: bool = False):
             line=dict(color=COLOR_PRIMARY_50, width=1, dash='dash'), opacity=1.0, hoverinfo='skip', showlegend=False
         ))
         index_position = int(len(T_DB_RANGE) * 0.75)
+        while index_position > 0 and W_rh_list[index_position] > W_MAX:
+            index_position -= 1
         fig.add_annotation(
             x=T_DB_RANGE[index_position], y=W_rh_list[index_position],
             text=f'{rh}%', showarrow=False,
@@ -121,23 +120,13 @@ def generate_base_chart(show_design_zone: bool = False):
             xanchor='left', yanchor='middle'
         )
 
-    # "Enthalpy kJ/kg" label — added once, outside the loop
+    # "Enthalpy kJ/kg" label — placed in the empty area above the saturation curve
     fig.add_annotation(
-        x=10, y=15,
+        x=5, y=24,
         text='Enthalpy kJ/kg', showarrow=False,
         font=dict(family='Arial, sans-serif', size=18, color=COLOR_PRIMARY),
         xanchor='left', yanchor='middle'
     )
-
-    # Comfort Zone (Optional)
-    if show_design_zone:
-        fig.add_trace(go.Scatter(
-            x=[20, 24, 24, 20, 20],
-            y=[W_COMFORT_LOW[0], W_COMFORT_LOW[1], W_COMFORT_HIGH[1], W_COMFORT_HIGH[0], W_COMFORT_LOW[0]],
-            mode='lines', name='Comfort Zone', line=dict(color='green', dash='dash', width=2),
-            fill='toself', fillcolor='rgba(0,255,0,0.1)',
-            hovertemplate='Comfort Zone<extra></extra>'
-        ))
 
     # Update Layout
     fig.update_layout(
@@ -164,28 +153,64 @@ def generate_base_chart(show_design_zone: bool = False):
     return fig
 
 
-# Cache both base chart variants at startup
-BASE_CHART_NO_ZONE   = generate_base_chart(False)
-BASE_CHART_WITH_ZONE = generate_base_chart(True)
+# Cache base chart at startup
+BASE_CHART = generate_base_chart()
 
 
-def get_base_chart(show_design_zone: bool) -> go.Figure:
+def get_base_chart() -> go.Figure:
     """Returns a deep copy of the cached base chart."""
-    src = BASE_CHART_WITH_ZONE if show_design_zone else BASE_CHART_NO_ZONE
-    return copy.deepcopy(src)
+    return copy.deepcopy(BASE_CHART)
+
+
+def add_design_zone_trace(fig, min_temp, max_temp, min_rh, max_rh):
+    w_low_left   = calc_humidity_ratio(min_temp, min_rh)
+    w_low_right  = calc_humidity_ratio(max_temp, min_rh)
+    w_high_left  = calc_humidity_ratio(min_temp, max_rh)
+    w_high_right = calc_humidity_ratio(max_temp, max_rh)
+    fig.add_trace(go.Scatter(
+        x=[min_temp, max_temp, max_temp, min_temp, min_temp],
+        y=[w_low_left, w_low_right, w_high_right, w_high_left, w_low_left],
+        mode='lines', name='Design Zone',
+        line=dict(color='green', dash='dash', width=2),
+        fill='toself', fillcolor='rgba(0,255,0,0.1)',
+        hovertemplate='Design Zone<extra></extra>'
+    ))
+
+
+def _validate_design_zone(min_temp, max_temp, min_rh, max_rh):
+    if min_temp >= max_temp:
+        raise HTTPException(400, "Minimum temperature must be less than maximum temperature.")
+    if not (T_DB_MIN <= min_temp <= T_DB_MAX) or not (T_DB_MIN <= max_temp <= T_DB_MAX):
+        raise HTTPException(400, f"Design zone temperatures must be between {T_DB_MIN}°C and {T_DB_MAX}°C.")
+    if min_rh >= max_rh:
+        raise HTTPException(400, "Minimum RH must be less than maximum RH.")
+    if not (0 <= min_rh <= 100) or not (0 <= max_rh <= 100):
+        raise HTTPException(400, "Design zone RH values must be between 0% and 100%.")
 
 
 # --- API Endpoints ---
 
 @app.get("/api/default-chart")
-async def get_default_chart(showDesignZone: bool = False):
+async def get_default_chart(
+    showDesignZone: bool = False,
+    minTemp: float = 20.0, maxTemp: float = 24.0,
+    minRH: float = 40.0, maxRH: float = 60.0
+):
     """Serves the base chart without any plotted points."""
-    fig = get_base_chart(showDesignZone)
+    fig = get_base_chart()
+    if showDesignZone:
+        _validate_design_zone(minTemp, maxTemp, minRH, maxRH)
+        add_design_zone_trace(fig, minTemp, maxTemp, minRH, maxRH)
     return {"status": "success", "figure": fig.to_json()}
 
 
 @app.post("/api/generate-chart")
-async def generate_chart_from_file(file: UploadFile = File(...), showDesignZone: bool = Form(False)):
+async def generate_chart_from_file(
+    file: UploadFile = File(...),
+    showDesignZone: bool = Form(False),
+    minTemp: float = Form(20.0), maxTemp: float = Form(24.0),
+    minRH: float = Form(40.0), maxRH: float = Form(60.0)
+):
     """Generates chart with points plotted from an uploaded Excel file."""
     if not file.filename.endswith('.xlsx'):
         raise HTTPException(status_code=400, detail="Invalid file type. Only .xlsx files are supported.")
@@ -209,7 +234,10 @@ async def generate_chart_from_file(file: UploadFile = File(...), showDesignZone:
     except ValueError:
         raise HTTPException(status_code=400, detail="Non-numeric data found in Temperature or Humidity columns.")
 
-    fig = get_base_chart(showDesignZone)
+    fig = get_base_chart()
+    if showDesignZone:
+        _validate_design_zone(minTemp, maxTemp, minRH, maxRH)
+        add_design_zone_trace(fig, minTemp, maxTemp, minRH, maxRH)
     valid_T_db = []
     valid_W = []
     for t, rh in zip(T_db_points, RH_points):
@@ -232,7 +260,9 @@ async def generate_chart_from_file(file: UploadFile = File(...), showDesignZone:
 async def plot_single_point(
     temperature: float = Form(...),
     humidity: float = Form(...),
-    showDesignZone: bool = Form(False)
+    showDesignZone: bool = Form(False),
+    minTemp: float = Form(20.0), maxTemp: float = Form(24.0),
+    minRH: float = Form(40.0), maxRH: float = Form(60.0)
 ):
     """Generates chart with a single point plotted from manual input."""
     if not (T_DB_MIN <= temperature <= T_DB_MAX):
@@ -240,7 +270,10 @@ async def plot_single_point(
     if not (0 <= humidity <= 100):
         raise HTTPException(status_code=400, detail="Humidity must be between 0% and 100%.")
 
-    fig = get_base_chart(showDesignZone)
+    fig = get_base_chart()
+    if showDesignZone:
+        _validate_design_zone(minTemp, maxTemp, minRH, maxRH)
+        add_design_zone_trace(fig, minTemp, maxTemp, minRH, maxRH)
     W_point = calc_humidity_ratio(temperature, humidity)
 
     if W_point is None:
@@ -281,7 +314,7 @@ async def plot_single_point(
 
 @app.post("/api/clear-data")
 async def clear_data():
-    fig = get_base_chart(False)
+    fig = get_base_chart()
     return {"status": "success", "message": "Data cleared successfully", "figure": fig.to_json()}
 
 
