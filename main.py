@@ -163,13 +163,22 @@ def get_base_chart() -> go.Figure:
 
 
 def add_design_zone_trace(fig, min_temp, max_temp, min_rh, max_rh):
-    w_low_left   = calc_humidity_ratio(min_temp, min_rh)
-    w_low_right  = calc_humidity_ratio(max_temp, min_rh)
-    w_high_left  = calc_humidity_ratio(min_temp, max_rh)
-    w_high_right = calc_humidity_ratio(max_temp, max_rh)
+    import numpy as np
+    temps = np.linspace(min_temp, max_temp, 50)
+
+    # Bottom edge: min_rh curve, left to right
+    x_bottom = list(temps)
+    y_bottom = [calc_humidity_ratio(t, min_rh) for t in temps]
+
+    # Top edge: max_rh curve, right to left (reversed to close polygon)
+    x_top = list(reversed(temps))
+    y_top = [calc_humidity_ratio(t, max_rh) for t in reversed(temps)]
+
+    x_zone = x_bottom + x_top + [x_bottom[0]]
+    y_zone = y_bottom + y_top + [y_bottom[0]]
+
     fig.add_trace(go.Scatter(
-        x=[min_temp, max_temp, max_temp, min_temp, min_temp],
-        y=[w_low_left, w_low_right, w_high_right, w_high_left, w_low_left],
+        x=x_zone, y=y_zone,
         mode='lines', name='Design Zone',
         line=dict(color='green', dash='dash', width=2),
         fill='toself', fillcolor='rgba(0,255,0,0.1)',
