@@ -1,7 +1,7 @@
 // Chart module
 const ChartModule = {
-    fetchDefaultChart: function(showDesignZone) {
-        return fetch(`/api/default-chart?showDesignZone=${showDesignZone}`)
+    fetchAndParse: function(url, options) {
+        return fetch(url, options)
             .then(function(response) {
                 if (!response.ok) throw new Error(response.statusText);
                 return response.json();
@@ -11,21 +11,15 @@ const ChartModule = {
             });
     },
 
+    fetchDefaultChart: function(showDesignZone) {
+        return ChartModule.fetchAndParse(`/api/default-chart?showDesignZone=${showDesignZone}`);
+    },
+
     generateChart: function(file, showDesignZone) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('showDesignZone', showDesignZone);
-        return fetch('/api/generate-chart', {
-            method: 'POST',
-            body: formData
-        })
-        .then(function(response) {
-            if (!response.ok) throw new Error(response.statusText);
-            return response.json();
-        })
-        .then(function(data) {
-            return data.figure;
-        });
+        return ChartModule.fetchAndParse('/api/generate-chart', { method: 'POST', body: formData });
     },
 
     plotManualPoint: function(temperature, humidity, showDesignZone) {
@@ -33,30 +27,13 @@ const ChartModule = {
         formData.append('temperature', temperature);
         formData.append('humidity', humidity);
         formData.append('showDesignZone', showDesignZone);
-        return fetch('/api/plot-point', {
-            method: 'POST',
-            body: formData
-        })
-        .then(function(response) {
-            if (!response.ok) throw new Error(response.statusText);
-            return response.json();
-        })
-        .then(function(data) {
-            return data.figure;
-        });
+        return ChartModule.fetchAndParse('/api/plot-point', { method: 'POST', body: formData });
     },
 
     clearChart: function() {
-        return fetch('/api/clear-data', {
+        return ChartModule.fetchAndParse('/api/clear-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
-        })
-        .then(function(response) {
-            if (!response.ok) throw new Error(response.statusText);
-            return response.json();
-        })
-        .then(function(data) {
-            return data.figure;
         });
     },
 
@@ -68,6 +45,21 @@ const ChartModule = {
 
 // UI module
 const UIModule = {
+    isLoading: false,
+
+    handleChartUpdate: function(promise, statusEl) {
+        var chartContainer = document.getElementById('chartContainer');
+        return promise
+            .then(function(figure) {
+                ChartModule.renderChart(chartContainer, figure);
+                statusEl.textContent = '';
+            })
+            .catch(function(error) {
+                statusEl.textContent = 'Error: ' + error.message;
+                console.error('Error:', error);
+            });
+    },
+
     init: function() {
         const fileInput = document.getElementById('fileInput');
         const designZoneCheckbox = document.getElementById('designZone');
@@ -93,15 +85,10 @@ const UIModule = {
         // Handle design zone checkbox change
         designZoneCheckbox.addEventListener('change', function() {
             statusMessage.textContent = 'Updating design zone...';
-            ChartModule.fetchDefaultChart(designZoneCheckbox.checked)
-                .then(function(figure) {
-                    ChartModule.renderChart(chartContainer, figure);
-                    statusMessage.textContent = '';
-                })
-                .catch(function(error) {
-                    statusMessage.textContent = 'Error updating design zone: ' + error.message;
-                    console.error('Error:', error);
-                });
+            UIModule.handleChartUpdate(
+                ChartModule.fetchDefaultChart(designZoneCheckbox.checked),
+                statusMessage
+            );
         });
 
         // Handle file upload via button click
@@ -116,6 +103,7 @@ const UIModule = {
                 .then(function(figure) {
                     ChartModule.renderChart(chartContainer, figure);
                     statusMessage.textContent = '';
+                    fileInput.value = '';
                 })
                 .catch(function(error) {
                     statusMessage.textContent = 'Error updating chart: ' + error.message;
@@ -140,22 +128,25 @@ const UIModule = {
 
         // Handle manual input
         plotPointButton.addEventListener('click', function() {
+            if (UIModule.isLoading) return;
             const temperature = parseFloat(tempInput.value);
             const humidity = parseFloat(humidityInput.value);
             if (isNaN(temperature) || isNaN(humidity)) {
                 manualInputStatus.textContent = 'Please enter valid numbers!';
                 return;
             }
+            if (temperature < -10 || temperature > 50) {
+                manualInputStatus.textContent = 'Temperature must be between -10°C and 50°C.';
+                return;
+            }
+            UIModule.isLoading = true;
             manualInputStatus.textContent = 'Plotting point...';
-            ChartModule.plotManualPoint(temperature, humidity, designZoneCheckbox.checked)
-                .then(function(figure) {
-                    ChartModule.renderChart(chartContainer, figure);
-                    manualInputStatus.textContent = '';
-                })
-                .catch(function(error) {
-                    manualInputStatus.textContent = 'Error plotting point: ' + error.message;
-                    console.error('Error:', error);
-                });
+            UIModule.handleChartUpdate(
+                ChartModule.plotManualPoint(temperature, humidity, designZoneCheckbox.checked),
+                manualInputStatus
+            ).finally(function() {
+                UIModule.isLoading = false;
+            });
         });
     }
 };

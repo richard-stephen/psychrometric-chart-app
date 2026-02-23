@@ -6,7 +6,8 @@ import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
 import io
-from simple_enthalpy import calc_humidity_ratio, calc_enthalpy
+import copy
+from simple_enthalpy import calc_humidity_ratio, calc_enthalpy, ATMOSPHERIC_PRESSURE_PA, GRAMS_PER_KG
 
 app = FastAPI()
 
@@ -33,8 +34,10 @@ class CustomStaticFiles(StaticFiles):
 app.mount("/static", CustomStaticFiles(directory="static", html=True), name="static")
 
 # Constants
-ATMOSPHERIC_PRESSURE_PA = 101325
-GRAMS_PER_KG = 1000
+COLOR_PRIMARY    = 'rgba(38,70,83,1)'
+COLOR_PRIMARY_80 = 'rgba(38,70,83,0.8)'
+COLOR_PRIMARY_50 = 'rgba(38,70,83,0.5)'
+
 T_DB_MIN, T_DB_MAX = -10, 50
 W_MIN, W_MAX = 0, 30
 t_axis = range(-10, 46, 5)
@@ -43,27 +46,32 @@ t_axis = range(-10, 46, 5)
 DEWPOINT_DATA = pd.read_csv('dewpoint_data.csv').to_dict('records')
 ENTHALPY_DATA = pd.read_csv('enthalpy_intersections.csv').to_dict('records')
 
+# Pre-computed chart data (computed once at startup)
+T_DB_RANGE    = np.linspace(T_DB_MIN, T_DB_MAX, 100)
+W_SAT_LIST    = [calc_humidity_ratio(t, 100.0) for t in T_DB_RANGE]
+_SAT_AT_T     = {t: calc_humidity_ratio(t, 100.0) for t in t_axis}
+_T_comfort    = np.array([20, 24])
+W_COMFORT_LOW  = [calc_humidity_ratio(t, 40) for t in _T_comfort]
+W_COMFORT_HIGH = [calc_humidity_ratio(t, 60) for t in _T_comfort]
+
 
 # --- Helper Functions ---
 
 def generate_base_chart(show_design_zone: bool = False):
     """Generates the base psychrometric chart figure with enthalpy lines."""
-    T_db_range = np.linspace(T_DB_MIN, T_DB_MAX, 100)
     fig = go.Figure()
 
     # Saturation Line (100% RH)
-    W_sat_list = [calc_humidity_ratio(t, 100.0) for t in T_db_range]
     fig.add_trace(go.Scatter(
-        x=T_db_range, y=W_sat_list, mode='lines', showlegend=False,
-        line=dict(color='rgba(38,70,83,0.8)', width=2), hoverinfo='skip'
+        x=T_DB_RANGE, y=W_SAT_LIST, mode='lines', showlegend=False,
+        line=dict(color=COLOR_PRIMARY_80, width=2), hoverinfo='skip'
     ))
 
     # Vertical dry-bulb temperature lines
     for t in t_axis:
-        w_sat_t = calc_humidity_ratio(t, 100.0)
         fig.add_trace(go.Scatter(
-            x=[t, t], y=[0, w_sat_t], mode='lines',
-            line=dict(color='rgba(38,70,83,0.5)', width=1), opacity=0.3, hoverinfo='skip', showlegend=False
+            x=[t, t], y=[0, _SAT_AT_T[t]], mode='lines',
+            line=dict(color=COLOR_PRIMARY_50, width=1), opacity=0.3, hoverinfo='skip', showlegend=False
         ))
 
     # Horizontal humidity ratio lines (from dew point to T_DB_MAX)
@@ -72,22 +80,22 @@ def generate_base_chart(show_design_zone: bool = False):
         dewpoint = data['Dew point']
         fig.add_trace(go.Scatter(
             x=[dewpoint, T_DB_MAX], y=[hr, hr], mode='lines',
-            line=dict(color='rgba(38,70,83,0.5)', width=1), opacity=0.3, hoverinfo='skip', showlegend=False
+            line=dict(color=COLOR_PRIMARY_50, width=1), opacity=0.3, hoverinfo='skip', showlegend=False
         ))
 
     # Relative Humidity Lines
     RH_levels = [10, 20, 30, 40, 50, 60, 70, 80, 90]
     for rh in RH_levels:
-        W_rh_list = [calc_humidity_ratio(t, float(rh)) for t in T_db_range]
+        W_rh_list = [calc_humidity_ratio(t, float(rh)) for t in T_DB_RANGE]
         fig.add_trace(go.Scatter(
-            x=T_db_range, y=W_rh_list, mode='lines',
-            line=dict(color='rgba(38,70,83,0.5)', width=1, dash='dash'), opacity=1.0, hoverinfo='skip', showlegend=False
+            x=T_DB_RANGE, y=W_rh_list, mode='lines',
+            line=dict(color=COLOR_PRIMARY_50, width=1, dash='dash'), opacity=1.0, hoverinfo='skip', showlegend=False
         ))
-        index_position = int(len(T_db_range) * 0.75)
+        index_position = int(len(T_DB_RANGE) * 0.75)
         fig.add_annotation(
-            x=T_db_range[index_position], y=W_rh_list[index_position],
+            x=T_DB_RANGE[index_position], y=W_rh_list[index_position],
             text=f'{rh}%', showarrow=False,
-            font=dict(size=10, color='rgba(38,70,83,1)'),
+            font=dict(size=10, color=COLOR_PRIMARY),
             xanchor='center', yanchor='middle'
         )
 
@@ -103,7 +111,7 @@ def generate_base_chart(show_design_zone: bool = False):
 
         fig.add_trace(go.Scatter(
             x=T_points, y=W_points, mode='lines',
-            line=dict(color='rgba(38,70,83,1)', width=1, dash='dot'),
+            line=dict(color=COLOR_PRIMARY, width=1, dash='dot'),
             hoverinfo='skip', showlegend=False,
         ))
         fig.add_annotation(
@@ -117,18 +125,15 @@ def generate_base_chart(show_design_zone: bool = False):
     fig.add_annotation(
         x=10, y=15,
         text='Enthalpy kJ/kg', showarrow=False,
-        font=dict(family='Arial, sans-serif', size=18, color='rgba(38,70,83,1)'),
+        font=dict(family='Arial, sans-serif', size=18, color=COLOR_PRIMARY),
         xanchor='left', yanchor='middle'
     )
 
     # Comfort Zone (Optional)
     if show_design_zone:
-        T_comfort = np.array([20, 24])
-        W_comfort_low = [calc_humidity_ratio(t, 40) for t in T_comfort]
-        W_comfort_high = [calc_humidity_ratio(t, 60) for t in T_comfort]
         fig.add_trace(go.Scatter(
             x=[20, 24, 24, 20, 20],
-            y=[W_comfort_low[0], W_comfort_low[1], W_comfort_high[1], W_comfort_high[0], W_comfort_low[0]],
+            y=[W_COMFORT_LOW[0], W_COMFORT_LOW[1], W_COMFORT_HIGH[1], W_COMFORT_HIGH[0], W_COMFORT_LOW[0]],
             mode='lines', name='Comfort Zone', line=dict(color='green', dash='dash', width=2),
             fill='toself', fillcolor='rgba(0,255,0,0.1)',
             hovertemplate='Comfort Zone<extra></extra>'
@@ -159,12 +164,23 @@ def generate_base_chart(show_design_zone: bool = False):
     return fig
 
 
+# Cache both base chart variants at startup
+BASE_CHART_NO_ZONE   = generate_base_chart(False)
+BASE_CHART_WITH_ZONE = generate_base_chart(True)
+
+
+def get_base_chart(show_design_zone: bool) -> go.Figure:
+    """Returns a deep copy of the cached base chart."""
+    src = BASE_CHART_WITH_ZONE if show_design_zone else BASE_CHART_NO_ZONE
+    return copy.deepcopy(src)
+
+
 # --- API Endpoints ---
 
 @app.get("/api/default-chart")
 async def get_default_chart(showDesignZone: bool = False):
     """Serves the base chart without any plotted points."""
-    fig = generate_base_chart(showDesignZone)
+    fig = get_base_chart(showDesignZone)
     return {"status": "success", "figure": fig.to_json()}
 
 
@@ -193,7 +209,7 @@ async def generate_chart_from_file(file: UploadFile = File(...), showDesignZone:
     except ValueError:
         raise HTTPException(status_code=400, detail="Non-numeric data found in Temperature or Humidity columns.")
 
-    fig = generate_base_chart(showDesignZone)
+    fig = get_base_chart(showDesignZone)
     valid_T_db = []
     valid_W = []
     for t, rh in zip(T_db_points, RH_points):
@@ -224,7 +240,7 @@ async def plot_single_point(
     if not (0 <= humidity <= 100):
         raise HTTPException(status_code=400, detail="Humidity must be between 0% and 100%.")
 
-    fig = generate_base_chart(showDesignZone)
+    fig = get_base_chart(showDesignZone)
     W_point = calc_humidity_ratio(temperature, humidity)
 
     if W_point is None:
@@ -265,23 +281,13 @@ async def plot_single_point(
 
 @app.post("/api/clear-data")
 async def clear_data():
-    fig = generate_base_chart()
+    fig = get_base_chart(False)
     return {"status": "success", "message": "Data cleared successfully", "figure": fig.to_json()}
 
 
 @app.get("/")
 async def root():
     return FileResponse("static/index.html", headers={"Cache-Control": "no-store"})
-
-
-@app.get("/app.js")
-async def serve_app_js():
-    return FileResponse("static/app.js", headers={"Cache-Control": "no-store"})
-
-
-@app.get("/styles.css")
-async def serve_styles_css():
-    return FileResponse("static/styles.css", headers={"Cache-Control": "no-store"})
 
 
 if __name__ == "__main__":

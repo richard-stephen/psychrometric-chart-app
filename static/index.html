@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Psychrometric Chart</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/static/styles.css">
     <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
 </head>
 <body>
@@ -18,14 +18,14 @@
                 <h3>Manual Input</h3>
                 <div class="manual-input-group">
                     <label for="tempInput">Temperature (°C):</label>
-                    <input type="number" id="tempInput" placeholder="e.g., 25">
+                    <input type="number" id="tempInput" placeholder="e.g., 25" min="-10" max="50">
                 </div>
                 <div class="manual-input-group">
                     <label for="humidityInput">Relative Humidity (%):</label>
                     <input type="number" id="humidityInput" placeholder="e.g., 50" min="0" max="100">
                 </div>
                 <button id="plotPointButton">Plot Point</button>
-                <p id="manualInputStatus"></p> <!-- Status message specific to manual input -->
+                <p id="manualInputStatus" role="status" aria-live="polite"></p>
             </div>
             <!-- File Upload Section -->
             <form id="uploadForm">
@@ -39,14 +39,14 @@
                 <button id="updateChartFromFileButton">Update Chart from File</button>
                 <button id="clearDataButton">Clear Data</button>
             </form>
-            <p id="statusMessage"></p> <!-- General status message (kept from original) -->
+            <p id="statusMessage" role="status" aria-live="polite"></p>
         </div>
 
         <!-- Right Section: Chart -->
         <div class="right-section">
-            <div id="chartContainer"></div>
+            <div id="chartContainer" role="img" aria-label="Psychrometric chart"></div>
         </div>
     </div>
-    <script type="module" src="app.js"></script>
+    <script type="module" src="/static/app.js"></script>
 </body>
 </html>

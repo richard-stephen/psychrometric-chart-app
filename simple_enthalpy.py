@@ -18,7 +18,7 @@ def calc_humidity_ratio(T_db, RH_percent, P=ATMOSPHERIC_PRESSURE_PA):
         P_w = RH * P_ws
         W = 0.621945 * P_w / (P - P_w)
         return W * GRAMS_PER_KG
-    except Exception as e:
+    except (ValueError, TypeError) as e:
         print(f"Warning: psychrolib calculation error T={T_db}, RH={RH_percent}: {e}")
         return None
 
@@ -29,6 +29,6 @@ def calc_enthalpy(T_db, W, P=ATMOSPHERIC_PRESSURE_PA):
         W_kg = W / GRAMS_PER_KG
         enthalpy = psy.GetMoistAirEnthalpy(T_db, W_kg)
         return enthalpy / 1000  # Convert J/kg to kJ/kg
-    except Exception as e:
+    except (ValueError, TypeError) as e:
         print(f"Warning: psychrolib enthalpy calculation error T={T_db}, W={W}: {e}")
         return 0
