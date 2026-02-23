@@ -11,22 +11,38 @@ const ChartModule = {
             });
     },
 
-    fetchDefaultChart: function(showDesignZone) {
-        return ChartModule.fetchAndParse(`/api/default-chart?showDesignZone=${showDesignZone}`);
+    fetchDefaultChart: function(showDesignZone, zoneParams) {
+        var url = `/api/default-chart?showDesignZone=${showDesignZone}`;
+        if (showDesignZone && zoneParams) {
+            url += `&minTemp=${zoneParams.minTemp}&maxTemp=${zoneParams.maxTemp}&minRH=${zoneParams.minRH}&maxRH=${zoneParams.maxRH}`;
+        }
+        return ChartModule.fetchAndParse(url);
     },
 
-    generateChart: function(file, showDesignZone) {
+    generateChart: function(file, showDesignZone, zoneParams) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('showDesignZone', showDesignZone);
+        if (showDesignZone && zoneParams) {
+            formData.append('minTemp', zoneParams.minTemp);
+            formData.append('maxTemp', zoneParams.maxTemp);
+            formData.append('minRH', zoneParams.minRH);
+            formData.append('maxRH', zoneParams.maxRH);
+        }
         return ChartModule.fetchAndParse('/api/generate-chart', { method: 'POST', body: formData });
     },
 
-    plotManualPoint: function(temperature, humidity, showDesignZone) {
+    plotManualPoint: function(temperature, humidity, showDesignZone, zoneParams) {
         const formData = new FormData();
         formData.append('temperature', temperature);
         formData.append('humidity', humidity);
         formData.append('showDesignZone', showDesignZone);
+        if (showDesignZone && zoneParams) {
+            formData.append('minTemp', zoneParams.minTemp);
+            formData.append('maxTemp', zoneParams.maxTemp);
+            formData.append('minRH', zoneParams.minRH);
+            formData.append('maxRH', zoneParams.maxRH);
+        }
         return ChartModule.fetchAndParse('/api/plot-point', { method: 'POST', body: formData });
     },
 
@@ -42,6 +58,30 @@ const ChartModule = {
         Plotly.newPlot(container, fig.data, fig.layout);
     }
 };
+
+function getDesignZoneParams() {
+    var minTemp = parseFloat(document.getElementById('zoneMinTemp').value);
+    var maxTemp = parseFloat(document.getElementById('zoneMaxTemp').value);
+    var minRH   = parseFloat(document.getElementById('zoneMinRH').value);
+    var maxRH   = parseFloat(document.getElementById('zoneMaxRH').value);
+
+    if (isNaN(minTemp) || isNaN(maxTemp) || isNaN(minRH) || isNaN(maxRH)) {
+        return { valid: false, error: 'Please enter valid numbers for all design zone fields.' };
+    }
+    if (minTemp >= maxTemp) {
+        return { valid: false, error: 'Minimum temperature must be less than maximum temperature.' };
+    }
+    if (minTemp < -10 || maxTemp > 50) {
+        return { valid: false, error: 'Design zone temperatures must be between -10°C and 50°C.' };
+    }
+    if (minRH >= maxRH) {
+        return { valid: false, error: 'Minimum RH must be less than maximum RH.' };
+    }
+    if (minRH < 0 || maxRH > 100) {
+        return { valid: false, error: 'Design zone RH values must be between 0% and 100%.' };
+    }
+    return { valid: true, minTemp: minTemp, maxTemp: maxTemp, minRH: minRH, maxRH: maxRH };
+}
 
 // UI module
 const UIModule = {
@@ -63,6 +103,7 @@ const UIModule = {
     init: function() {
         const fileInput = document.getElementById('fileInput');
         const designZoneCheckbox = document.getElementById('designZone');
+        const designZoneInputs = document.getElementById('designZoneInputs');
         const statusMessage = document.getElementById('statusMessage');
         const chartContainer = document.getElementById('chartContainer');
         const tempInput = document.getElementById('tempInput');
@@ -84,11 +125,35 @@ const UIModule = {
 
         // Handle design zone checkbox change
         designZoneCheckbox.addEventListener('change', function() {
+            designZoneInputs.style.display = designZoneCheckbox.checked ? 'block' : 'none';
+            if (designZoneCheckbox.checked) {
+                var params = getDesignZoneParams();
+                if (!params.valid) {
+                    statusMessage.textContent = params.error;
+                    return;
+                }
+                statusMessage.textContent = 'Updating design zone...';
+                UIModule.handleChartUpdate(ChartModule.fetchDefaultChart(true, params), statusMessage);
+            } else {
+                statusMessage.textContent = 'Updating design zone...';
+                UIModule.handleChartUpdate(ChartModule.fetchDefaultChart(false), statusMessage);
+            }
+        });
+
+        // Auto-update chart when zone inputs change
+        function handleZoneInputChange() {
+            if (!designZoneCheckbox.checked) return;
+            var params = getDesignZoneParams();
+            if (!params.valid) {
+                statusMessage.textContent = params.error;
+                return;
+            }
             statusMessage.textContent = 'Updating design zone...';
-            UIModule.handleChartUpdate(
-                ChartModule.fetchDefaultChart(designZoneCheckbox.checked),
-                statusMessage
-            );
+            UIModule.handleChartUpdate(ChartModule.fetchDefaultChart(true, params), statusMessage);
+        }
+
+        ['zoneMinTemp', 'zoneMaxTemp', 'zoneMinRH', 'zoneMaxRH'].forEach(function(id) {
+            document.getElementById(id).addEventListener('change', handleZoneInputChange);
         });
 
         // Handle file upload via button click
@@ -98,8 +163,17 @@ const UIModule = {
                 statusMessage.textContent = 'Please select a file!';
                 return;
             }
+            var zoneParams = null;
+            if (designZoneCheckbox.checked) {
+                var params = getDesignZoneParams();
+                if (!params.valid) {
+                    statusMessage.textContent = params.error;
+                    return;
+                }
+                zoneParams = params;
+            }
             statusMessage.textContent = 'Updating chart...';
-            ChartModule.generateChart(fileInput.files[0], designZoneCheckbox.checked)
+            ChartModule.generateChart(fileInput.files[0], designZoneCheckbox.checked, zoneParams)
                 .then(function(figure) {
                     ChartModule.renderChart(chartContainer, figure);
                     statusMessage.textContent = '';
@@ -139,10 +213,19 @@ const UIModule = {
                 manualInputStatus.textContent = 'Temperature must be between -10°C and 50°C.';
                 return;
             }
+            var zoneParams = null;
+            if (designZoneCheckbox.checked) {
+                var params = getDesignZoneParams();
+                if (!params.valid) {
+                    manualInputStatus.textContent = params.error;
+                    return;
+                }
+                zoneParams = params;
+            }
             UIModule.isLoading = true;
             manualInputStatus.textContent = 'Plotting point...';
             UIModule.handleChartUpdate(
-                ChartModule.plotManualPoint(temperature, humidity, designZoneCheckbox.checked),
+                ChartModule.plotManualPoint(temperature, humidity, designZoneCheckbox.checked, zoneParams),
                 manualInputStatus
             ).finally(function() {
                 UIModule.isLoading = false;

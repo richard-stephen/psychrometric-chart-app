@@ -27,7 +27,8 @@ body {
 }
 
 .left-section {
-    width: 30%;
+    width: 25%;
+    min-width: 240px;
     padding: var(--spacing-md);
     background: var(--color-bg);
     box-shadow: none;
