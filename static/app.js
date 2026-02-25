@@ -55,7 +55,7 @@ const ChartModule = {
 
     renderChart: function(container, figure) {
         const fig = JSON.parse(figure);
-        Plotly.newPlot(container, fig.data, fig.layout);
+        Plotly.newPlot(container, fig.data, fig.layout, {responsive: true});
     }
 };
 

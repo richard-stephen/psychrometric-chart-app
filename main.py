@@ -130,6 +130,7 @@ def generate_base_chart():
 
     # Update Layout
     fig.update_layout(
+        autosize=True,
         template='plotly_white',
         plot_bgcolor='white', paper_bgcolor='white',
         title=dict(
