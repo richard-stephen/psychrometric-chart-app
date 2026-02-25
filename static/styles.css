@@ -31,7 +31,7 @@ body {
     min-width: 240px;
     padding: var(--spacing-md);
     background: var(--color-bg);
-    box-shadow: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     overflow-y: auto;
@@ -41,7 +41,7 @@ body {
     flex-grow: 1;
     padding: var(--spacing-md);
     background-color: var(--color-bg);
-    box-shadow: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     display: flex;
@@ -110,6 +110,7 @@ input, textarea {
     border-radius: 0;
     font-size: 1rem;
     box-sizing: border-box;
+    transition: border-color 0.2s ease;
 }
 
 input:focus, textarea:focus {
@@ -125,12 +126,11 @@ button {
     border-radius: 4px;
     font-size: 1rem;
     cursor: pointer;
-    transition: background 0.3s ease, transform 0.2s ease;
+    transition: background 0.3s ease;
 }
 
 button:hover {
-    background: #333333;
-    transform: scale(1.05);
+    background: #264653;
 }
 
 #chartContainer {

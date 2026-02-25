@@ -122,9 +122,9 @@ def generate_base_chart():
 
     # "Enthalpy kJ/kg" label — placed in the empty area above the saturation curve
     fig.add_annotation(
-        x=5, y=24,
+        x=14, y=27,
         text='Enthalpy kJ/kg', showarrow=False,
-        font=dict(family='Arial, sans-serif', size=18, color=COLOR_PRIMARY),
+        font=dict(family='Arial, sans-serif', size=14, color=COLOR_PRIMARY),
         xanchor='left', yanchor='middle'
     )
 
@@ -134,8 +134,8 @@ def generate_base_chart():
         template='plotly_white',
         plot_bgcolor='white', paper_bgcolor='white',
         title=dict(
-            text='<b>Psychrometric Chart</b>',
-            font=dict(family='"Segoe UI", sans-serif', size=28, color='#111111')
+            text='Psychrometric Chart',
+            font=dict(family='"Segoe UI", sans-serif', size=20, color='#264653')
         ), title_x=0.5,
         xaxis=dict(
             title='Dry-Bulb Temperature (°C)', range=[T_DB_MIN, T_DB_MAX],
@@ -147,7 +147,7 @@ def generate_base_chart():
             showline=True, linewidth=1, linecolor='black', mirror=True,
             showgrid=False, gridcolor='lightgrey', gridwidth=1, zeroline=False
         ),
-        margin=dict(l=40, r=60, t=60, b=40),
+        margin=dict(l=40, r=60, t=45, b=40),
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(255,255,255,0.7)"),
         hovermode='closest'
     )
@@ -221,22 +221,25 @@ async def generate_chart_from_file(
     minTemp: float = Form(20.0), maxTemp: float = Form(24.0),
     minRH: float = Form(40.0), maxRH: float = Form(60.0)
 ):
-    """Generates chart with points plotted from an uploaded Excel file."""
-    if not file.filename.endswith('.xlsx'):
-        raise HTTPException(status_code=400, detail="Invalid file type. Only .xlsx files are supported.")
+    """Generates chart with points plotted from an uploaded Excel or CSV file."""
+    if not (file.filename.endswith('.xlsx') or file.filename.endswith('.csv')):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only .xlsx and .csv files are supported.")
 
     content = await file.read()
     await file.close()
 
     try:
-        df = pd.read_excel(io.BytesIO(content), engine='openpyxl')
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(content))
+        else:
+            df = pd.read_excel(io.BytesIO(content), engine='openpyxl')
     except Exception as e:
         error_msg = str(e)
-        print(f"Excel reading error: {error_msg}")
-        raise HTTPException(status_code=400, detail=f"Error reading Excel file: {error_msg}")
+        print(f"File reading error: {error_msg}")
+        raise HTTPException(status_code=400, detail=f"Error reading file: {error_msg}")
 
     if 'Temperature' not in df.columns or 'Humidity' not in df.columns:
-        raise HTTPException(status_code=400, detail="Excel file must contain 'Temperature' (°C) and 'Humidity' (%) columns")
+        raise HTTPException(status_code=400, detail="File must contain 'Temperature' (°C) and 'Humidity' (%) columns")
 
     try:
         T_db_points = df['Temperature'].astype(float).tolist()
@@ -290,12 +293,6 @@ async def plot_single_point(
         raise HTTPException(status_code=400, detail="Could not calculate point properties. Check input values.")
 
     enthalpy = calc_enthalpy(temperature, W_point)
-    legend_name = (
-        f"Point<br>T: {temperature:.1f}°C<br>"
-        f"Relative Humidity: {humidity:.1f}%<br>"
-        f"Humidity Ratio: {W_point:.2f} g/kg<br>"
-        f"Enthalpy: {enthalpy:.1f} kJ/kg"
-    )
     hover_template = (
         '<b>Point Properties:</b><br>'
         f'Temp: %{{x:.1f}}°C<br>'
@@ -306,18 +303,11 @@ async def plot_single_point(
     )
 
     fig.add_trace(go.Scatter(
-        x=[temperature], y=[W_point], mode='markers', name=legend_name,
+        x=[temperature], y=[W_point], mode='markers',
+        showlegend=False,
         marker=dict(color='red', size=10, symbol='circle'),
         hovertemplate=hover_template
     ))
-    fig.update_layout(
-        legend=dict(
-            x=0.01, y=0.99,
-            xanchor='left', yanchor='top',
-            bgcolor='rgba(255,255,255,0.8)',
-            bordercolor='black', borderwidth=1
-        )
-    )
 
     return {"status": "success", "figure": fig.to_json()}
 
