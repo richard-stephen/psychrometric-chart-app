@@ -59,6 +59,48 @@ const ChartModule = {
     }
 };
 
+var storedZoneParams = { minTemp: 20, maxTemp: 24, minRH: 40, maxRH: 60 };
+var currentFile = null;
+var currentManualPoint = null;
+
+function refreshChart(showZone, zoneParams) {
+    if (currentFile) {
+        return ChartModule.generateChart(currentFile, showZone, zoneParams);
+    }
+    if (currentManualPoint) {
+        return ChartModule.plotManualPoint(
+            currentManualPoint.temperature,
+            currentManualPoint.humidity,
+            showZone,
+            zoneParams
+        );
+    }
+    return ChartModule.fetchDefaultChart(showZone, zoneParams);
+}
+
+function showToast(message, type) {
+    var container = document.getElementById('toastContainer');
+    var ariaLive = document.getElementById('statusMessage');
+    var toast = document.createElement('div');
+    toast.className = 'toast' + (type === 'success' ? ' success' : '');
+    toast.textContent = message;
+
+    if (ariaLive) {
+        ariaLive.textContent = message;
+    }
+
+    function dismiss() {
+        toast.classList.add('fade-out');
+        setTimeout(function() {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 400);
+    }
+
+    toast.addEventListener('click', dismiss);
+    container.appendChild(toast);
+    setTimeout(dismiss, 4000);
+}
+
 function getDesignZoneParams() {
     var minTemp = parseFloat(document.getElementById('zoneMinTemp').value);
     var maxTemp = parseFloat(document.getElementById('zoneMaxTemp').value);
@@ -87,15 +129,14 @@ function getDesignZoneParams() {
 const UIModule = {
     isLoading: false,
 
-    handleChartUpdate: function(promise, statusEl) {
+    handleChartUpdate: function(promise) {
         var chartContainer = document.getElementById('chartContainer');
         return promise
             .then(function(figure) {
                 ChartModule.renderChart(chartContainer, figure);
-                statusEl.textContent = '';
             })
             .catch(function(error) {
-                statusEl.textContent = 'Error: ' + error.message;
+                showToast('Error: ' + error.message, 'error');
                 console.error('Error:', error);
             });
     },
@@ -103,15 +144,27 @@ const UIModule = {
     init: function() {
         const fileInput = document.getElementById('fileInput');
         const designZoneCheckbox = document.getElementById('designZone');
-        const designZoneInputs = document.getElementById('designZoneInputs');
-        const statusMessage = document.getElementById('statusMessage');
+        const configureButton = document.getElementById('configureZoneButton');
+        const designZoneModal = document.getElementById('designZoneModal');
+        const applyButton = document.getElementById('applyZoneButton');
+        const cancelButton = document.getElementById('cancelZoneButton');
         const chartContainer = document.getElementById('chartContainer');
         const tempInput = document.getElementById('tempInput');
         const humidityInput = document.getElementById('humidityInput');
         const plotPointButton = document.getElementById('plotPointButton');
-        const manualInputStatus = document.getElementById('manualInputStatus');
         const updateChartFromFileButton = document.getElementById('updateChartFromFileButton');
         const clearDataButton = document.getElementById('clearDataButton');
+
+        var zoneWasActive = false;
+
+        function openZoneModal(wasActive) {
+            zoneWasActive = wasActive;
+            document.getElementById('zoneMinTemp').value = storedZoneParams.minTemp;
+            document.getElementById('zoneMaxTemp').value = storedZoneParams.maxTemp;
+            document.getElementById('zoneMinRH').value = storedZoneParams.minRH;
+            document.getElementById('zoneMaxRH').value = storedZoneParams.maxRH;
+            designZoneModal.showModal();
+        }
 
         // Load default chart on page load
         ChartModule.fetchDefaultChart(false)
@@ -119,68 +172,73 @@ const UIModule = {
                 ChartModule.renderChart(chartContainer, figure);
             })
             .catch(function(error) {
-                statusMessage.textContent = 'Error loading default chart: ' + error.message;
+                showToast('Error loading default chart: ' + error.message, 'error');
                 console.error('Error:', error);
             });
 
         // Handle design zone checkbox change
         designZoneCheckbox.addEventListener('change', function() {
-            designZoneInputs.style.display = designZoneCheckbox.checked ? 'block' : 'none';
             if (designZoneCheckbox.checked) {
-                var params = getDesignZoneParams();
-                if (!params.valid) {
-                    statusMessage.textContent = params.error;
-                    return;
-                }
-                statusMessage.textContent = 'Updating design zone...';
-                UIModule.handleChartUpdate(ChartModule.fetchDefaultChart(true, params), statusMessage);
+                openZoneModal(false);
             } else {
-                statusMessage.textContent = 'Updating design zone...';
-                UIModule.handleChartUpdate(ChartModule.fetchDefaultChart(false), statusMessage);
+                configureButton.style.display = 'none';
+                UIModule.handleChartUpdate(refreshChart(false, null));
             }
         });
 
-        // Auto-update chart when zone inputs change
-        function handleZoneInputChange() {
-            if (!designZoneCheckbox.checked) return;
+        // Configure button reopens modal when zone is already active
+        configureButton.addEventListener('click', function() {
+            openZoneModal(true);
+        });
+
+        // Modal Apply button
+        applyButton.addEventListener('click', function() {
             var params = getDesignZoneParams();
             if (!params.valid) {
-                statusMessage.textContent = params.error;
+                showToast(params.error, 'error');
                 return;
             }
-            statusMessage.textContent = 'Updating design zone...';
-            UIModule.handleChartUpdate(ChartModule.fetchDefaultChart(true, params), statusMessage);
-        }
+            storedZoneParams = { minTemp: params.minTemp, maxTemp: params.maxTemp, minRH: params.minRH, maxRH: params.maxRH };
+            designZoneModal.close();
+            configureButton.style.display = 'inline';
+            UIModule.handleChartUpdate(refreshChart(true, storedZoneParams));
+        });
 
-        ['zoneMinTemp', 'zoneMaxTemp', 'zoneMinRH', 'zoneMaxRH'].forEach(function(id) {
-            document.getElementById(id).addEventListener('change', handleZoneInputChange);
+        // Modal Cancel button
+        cancelButton.addEventListener('click', function() {
+            designZoneModal.close();
+            if (!zoneWasActive) {
+                designZoneCheckbox.checked = false;
+                configureButton.style.display = 'none';
+            }
+        });
+
+        // Escape key closes modal (cancel event)
+        designZoneModal.addEventListener('cancel', function() {
+            if (!zoneWasActive) {
+                designZoneCheckbox.checked = false;
+                configureButton.style.display = 'none';
+            }
         });
 
         // Handle file upload via button click
         updateChartFromFileButton.addEventListener('click', function(event) {
             event.preventDefault();
             if (!fileInput.files[0]) {
-                statusMessage.textContent = 'Please select a file!';
+                showToast('Please select a file!', 'error');
                 return;
             }
-            var zoneParams = null;
-            if (designZoneCheckbox.checked) {
-                var params = getDesignZoneParams();
-                if (!params.valid) {
-                    statusMessage.textContent = params.error;
-                    return;
-                }
-                zoneParams = params;
-            }
-            statusMessage.textContent = 'Updating chart...';
-            ChartModule.generateChart(fileInput.files[0], designZoneCheckbox.checked, zoneParams)
+            var theFile = fileInput.files[0];
+            var zoneParams = designZoneCheckbox.checked ? storedZoneParams : null;
+            ChartModule.generateChart(theFile, designZoneCheckbox.checked, zoneParams)
                 .then(function(figure) {
+                    currentFile = theFile;
+                    currentManualPoint = null;
                     ChartModule.renderChart(chartContainer, figure);
-                    statusMessage.textContent = '';
                     fileInput.value = '';
                 })
                 .catch(function(error) {
-                    statusMessage.textContent = 'Error updating chart: ' + error.message;
+                    showToast('Error updating chart: ' + error.message, 'error');
                     console.error('Error:', error);
                 });
         });
@@ -188,16 +246,11 @@ const UIModule = {
         // Handle clear data button click
         clearDataButton.addEventListener('click', function(event) {
             event.preventDefault();
-            statusMessage.textContent = 'Clearing data...';
-            ChartModule.clearChart()
-                .then(function(figure) {
-                    ChartModule.renderChart(chartContainer, figure);
-                    statusMessage.textContent = 'Data cleared successfully.';
-                })
-                .catch(function(error) {
-                    statusMessage.textContent = 'Error clearing data: ' + error.message;
-                    console.error('Error:', error);
-                });
+            UIModule.handleChartUpdate(ChartModule.clearChart().then(function(figure) {
+                currentFile = null;
+                currentManualPoint = null;
+                return figure;
+            }));
         });
 
         // Handle manual input
@@ -206,27 +259,22 @@ const UIModule = {
             const temperature = parseFloat(tempInput.value);
             const humidity = parseFloat(humidityInput.value);
             if (isNaN(temperature) || isNaN(humidity)) {
-                manualInputStatus.textContent = 'Please enter valid numbers!';
+                showToast('Please enter valid numbers!', 'error');
                 return;
             }
             if (temperature < -10 || temperature > 50) {
-                manualInputStatus.textContent = 'Temperature must be between -10°C and 50°C.';
+                showToast('Temperature must be between -10°C and 50°C.', 'error');
                 return;
             }
-            var zoneParams = null;
-            if (designZoneCheckbox.checked) {
-                var params = getDesignZoneParams();
-                if (!params.valid) {
-                    manualInputStatus.textContent = params.error;
-                    return;
-                }
-                zoneParams = params;
-            }
+            var zoneParams = designZoneCheckbox.checked ? storedZoneParams : null;
             UIModule.isLoading = true;
-            manualInputStatus.textContent = 'Plotting point...';
             UIModule.handleChartUpdate(
-                ChartModule.plotManualPoint(temperature, humidity, designZoneCheckbox.checked, zoneParams),
-                manualInputStatus
+                ChartModule.plotManualPoint(temperature, humidity, designZoneCheckbox.checked, zoneParams)
+                    .then(function(figure) {
+                        currentManualPoint = { temperature: temperature, humidity: humidity };
+                        currentFile = null;
+                        return figure;
+                    })
             ).finally(function() {
                 UIModule.isLoading = false;
             });
