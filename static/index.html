@@ -25,7 +25,7 @@
                     <input type="number" id="humidityInput" placeholder="e.g., 50" min="0" max="100">
                 </div>
                 <button id="plotPointButton">Plot Point</button>
-                <p id="manualInputStatus" role="status" aria-live="polite"></p>
+                <p id="manualInputStatus" class="visually-hidden" role="status" aria-live="polite"></p>
             </div>
             <!-- File Upload Section -->
             <form id="uploadForm">
@@ -35,29 +35,12 @@
                 <div class="checkbox-container">
                     <label for="designZone">Show Design Zone</label>
                     <input type="checkbox" id="designZone">
-                </div>
-                <div id="designZoneInputs" style="display:none;">
-                    <div class="manual-input-group">
-                        <label for="zoneMinTemp">Min Temperature (°C):</label>
-                        <input type="number" id="zoneMinTemp" value="20" min="-10" max="50" step="0.5">
-                    </div>
-                    <div class="manual-input-group">
-                        <label for="zoneMaxTemp">Max Temperature (°C):</label>
-                        <input type="number" id="zoneMaxTemp" value="24" min="-10" max="50" step="0.5">
-                    </div>
-                    <div class="manual-input-group">
-                        <label for="zoneMinRH">Min Relative Humidity (%):</label>
-                        <input type="number" id="zoneMinRH" value="40" min="0" max="100" step="1">
-                    </div>
-                    <div class="manual-input-group">
-                        <label for="zoneMaxRH">Max Relative Humidity (%):</label>
-                        <input type="number" id="zoneMaxRH" value="60" min="0" max="100" step="1">
-                    </div>
+                    <button type="button" id="configureZoneButton" style="display:none;">Configure…</button>
                 </div>
                 <button id="updateChartFromFileButton">Update Chart from File</button>
                 <button id="clearDataButton">Clear Data</button>
             </form>
-            <p id="statusMessage" role="status" aria-live="polite"></p>
+            <p id="statusMessage" class="visually-hidden" role="status" aria-live="polite"></p>
         </div>
 
         <!-- Right Section: Chart -->
@@ -65,6 +48,30 @@
             <div id="chartContainer" role="img" aria-label="Psychrometric chart"></div>
         </div>
     </div>
+    <dialog id="designZoneModal">
+        <h3>Design Zone Settings</h3>
+        <div class="manual-input-group">
+            <label for="zoneMinTemp">Min Temperature (°C):</label>
+            <input type="number" id="zoneMinTemp" value="20" min="-10" max="50" step="0.5">
+        </div>
+        <div class="manual-input-group">
+            <label for="zoneMaxTemp">Max Temperature (°C):</label>
+            <input type="number" id="zoneMaxTemp" value="24" min="-10" max="50" step="0.5">
+        </div>
+        <div class="manual-input-group">
+            <label for="zoneMinRH">Min Relative Humidity (%):</label>
+            <input type="number" id="zoneMinRH" value="40" min="0" max="100" step="1">
+        </div>
+        <div class="manual-input-group">
+            <label for="zoneMaxRH">Max Relative Humidity (%):</label>
+            <input type="number" id="zoneMaxRH" value="60" min="0" max="100" step="1">
+        </div>
+        <div class="modal-buttons">
+            <button type="button" id="cancelZoneButton">Cancel</button>
+            <button type="button" id="applyZoneButton">Apply</button>
+        </div>
+    </dialog>
+    <div id="toastContainer"></div>
     <script type="module" src="/static/app.js"></script>
 </body>
 </html>
