@@ -266,6 +266,10 @@ const UIModule = {
                 showToast('Temperature must be between -10°C and 50°C.', 'error');
                 return;
             }
+            if (humidity < 0 || humidity > 100) {
+                showToast('Relative Humidity must be between 0% and 100%.', 'error');
+                return;
+            }
             var zoneParams = designZoneCheckbox.checked ? storedZoneParams : null;
             UIModule.isLoading = true;
             UIModule.handleChartUpdate(

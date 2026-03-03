@@ -50,6 +50,8 @@ ENTHALPY_DATA = pd.read_csv('enthalpy_intersections.csv').to_dict('records')
 T_DB_RANGE    = np.linspace(T_DB_MIN, T_DB_MAX, 100)
 W_SAT_LIST    = [calc_humidity_ratio(t, 100.0) for t in T_DB_RANGE]
 _SAT_AT_T     = {t: calc_humidity_ratio(t, 100.0) for t in t_axis}
+RH_LEVELS     = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+RH_CURVES     = {rh: [calc_humidity_ratio(t, float(rh)) for t in T_DB_RANGE] for rh in RH_LEVELS}
 
 
 # --- Helper Functions ---
@@ -81,9 +83,8 @@ def generate_base_chart():
         ))
 
     # Relative Humidity Lines
-    RH_levels = [10, 20, 30, 40, 50, 60, 70, 80, 90]
-    for rh in RH_levels:
-        W_rh_list = [calc_humidity_ratio(t, float(rh)) for t in T_DB_RANGE]
+    for rh in RH_LEVELS:
+        W_rh_list = RH_CURVES[rh]
         fig.add_trace(go.Scatter(
             x=T_DB_RANGE, y=W_rh_list, mode='lines',
             line=dict(color=COLOR_PRIMARY_50, width=1, dash='dash'), opacity=1.0, hoverinfo='skip', showlegend=False
@@ -163,7 +164,6 @@ def get_base_chart() -> go.Figure:
 
 
 def add_design_zone_trace(fig, min_temp, max_temp, min_rh, max_rh):
-    import numpy as np
     temps = np.linspace(min_temp, max_temp, 50)
 
     # Bottom edge: min_rh curve, left to right
@@ -289,18 +289,19 @@ async def plot_single_point(
         raise HTTPException(status_code=400, detail="Could not calculate point properties. Check input values.")
 
     enthalpy = calc_enthalpy(temperature, W_point)
+    enthalpy_str = f"{enthalpy:.1f} kJ/kg" if enthalpy is not None else "N/A"
     legend_name = (
         f"Point<br>T: {temperature:.1f}°C<br>"
         f"Relative Humidity: {humidity:.1f}%<br>"
         f"Humidity Ratio: {W_point:.2f} g/kg<br>"
-        f"Enthalpy: {enthalpy:.1f} kJ/kg"
+        f"Enthalpy: {enthalpy_str}"
     )
     hover_template = (
         '<b>Point Properties:</b><br>'
         f'Temp: %{{x:.1f}}°C<br>'
         f'RH: {humidity:.1f}%<br>'
         f'Humidity Ratio: %{{y:.2f}} g/kg<br>'
-        f'Enthalpy: {enthalpy:.1f} kJ/kg<br>'
+        f'Enthalpy: {enthalpy_str}<br>'
         '<extra></extra>'
     )
 
