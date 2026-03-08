@@ -53,7 +53,6 @@ The `.xlsx` upload expects columns named exactly `Temperature` (°C) and `Humidi
 
 ## Code Style
 
-- **JavaScript**: Always use `function` keyword syntax (not arrow functions). Keep it simple — no frameworks, no bundlers.
 - **Python**: Keep logic straightforward; avoid over-engineering.
 - Chart axis ranges: X (dry-bulb temp) `-10` to `50`°C, Y (humidity ratio) `0` to `30` g/kg.
 - CORS is restricted to `https://psychrochart.onrender.com` and `http://localhost:8000`.
