@@ -247,20 +247,30 @@ async def generate_chart_from_file(
     if showDesignZone:
         _validate_design_zone(minTemp, maxTemp, minRH, maxRH)
         add_design_zone_trace(fig, minTemp, maxTemp, minRH, maxRH)
-    valid_T_db = []
-    valid_W = []
-    for t, rh in zip(T_db_points, RH_points):
-        W = calc_humidity_ratio(t, rh)
-        if W is not None:
-            valid_T_db.append(t)
-            valid_W.append(W)
+    YEAR_HOURS = 8760
 
-    if valid_T_db:
-        fig.add_trace(go.Scatter(
-            x=valid_T_db, y=valid_W, mode='markers', name='Uploaded Data',
-            marker=dict(color='red', size=2, symbol='x'),
-            hovertemplate='Temp: %{x:.1f}°C<br>Humidity Ratio: %{y:.2f} g/kg<extra>Uploaded Data</extra>'
-        ))
+    datasets = []
+    if len(T_db_points) > YEAR_HOURS:
+        datasets.append((T_db_points[:YEAR_HOURS], RH_points[:YEAR_HOURS], 'Dataset 1', 'red'))
+        datasets.append((T_db_points[YEAR_HOURS:], RH_points[YEAR_HOURS:], 'Dataset 2', 'green'))
+    else:
+        datasets.append((T_db_points, RH_points, 'Uploaded Data', 'red'))
+
+    for temps, humidities, name, color in datasets:
+        valid_T_db = []
+        valid_W = []
+        for t, rh in zip(temps, humidities):
+            W = calc_humidity_ratio(t, rh)
+            if W is not None:
+                valid_T_db.append(t)
+                valid_W.append(W)
+
+        if valid_T_db:
+            fig.add_trace(go.Scatter(
+                x=valid_T_db, y=valid_W, mode='markers', name=name,
+                marker=dict(color=color, size=2, symbol='x'),
+                hovertemplate='Temp: %{x:.1f}°C<br>Humidity Ratio: %{y:.2f} g/kg<extra>' + name + '</extra>'
+            ))
 
     return {"status": "success", "figure": fig.to_json()}
 
