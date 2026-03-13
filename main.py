@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import io
 import copy
-from simple_enthalpy import calc_humidity_ratio, calc_enthalpy, ATMOSPHERIC_PRESSURE_PA, GRAMS_PER_KG
+from simple_enthalpy import calc_humidity_ratio, calc_humidity_ratios_vectorized, calc_enthalpy, ATMOSPHERIC_PRESSURE_PA, GRAMS_PER_KG
 
 app = FastAPI()
 
@@ -114,18 +114,20 @@ def generate_base_chart():
             line=dict(color=COLOR_PRIMARY, width=1, dash='dot'),
             hoverinfo='skip', showlegend=False,
         ))
+        T_label = T_intersect - 0.8
+        W_label = ((h - 1.006 * T_label) * 1000) / (2501 + 1.86 * T_label)
         fig.add_annotation(
-            x=T_intersect, y=W_intersect,
+            x=T_label, y=W_label,
             text=f"{int(h)}", showarrow=False,
-            font=dict(size=9, color='purple'),
-            xanchor='left', yanchor='middle'
+            font=dict(size=9, color=COLOR_PRIMARY),
+            xanchor='center', yanchor='middle'
         )
 
     # "Enthalpy kJ/kg" label — placed in the empty area above the saturation curve
     fig.add_annotation(
-        x=5, y=24,
+        x=12, y=16,
         text='Enthalpy kJ/kg', showarrow=False,
-        font=dict(family='Arial, sans-serif', size=18, color=COLOR_PRIMARY),
+        font=dict(family='Arial, sans-serif', size=14, color=COLOR_PRIMARY),
         xanchor='left', yanchor='middle'
     )
 
